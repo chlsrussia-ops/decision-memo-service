@@ -59,7 +59,20 @@ async def generate_memo(product_id: str, force_refresh: bool = False) -> Decisio
         missing=evaluation["missing_data"],
     )
 
-    # 5. Assemble memo
+    # 5. Build next action suggestion
+    next_action = explanation_service.build_next_action(
+        verdict=evaluation["verdict"],
+        confidence=evaluation["confidence"],
+        red_flags=evaluation["red_flags"],
+        missing=evaluation["missing_data"],
+        risks=risks,
+    )
+
+    # 6. Data completeness (how many of 5 core scores available)
+    available = sum(1 for v in [data.tvs, data.pucs, data.srs, data.otrs, data.pcs] if v is not None)
+    data_completeness = round(available / 5, 2)
+
+    # 7. Assemble memo
     memo = DecisionMemo(
         product_id=product_id,
         summary=summary,
@@ -72,6 +85,8 @@ async def generate_memo(product_id: str, force_refresh: bool = False) -> Decisio
         unknowns=evaluation["missing_data"],
         red_flags=evaluation["red_flags"],
         decision_factors=evaluation["decision_factors"],
+        next_action=next_action,
+        data_completeness=data_completeness,
         human_required=True,
         rule_engine_version=rule_engine.RULE_ENGINE_VERSION,
         generated_at=datetime.now(timezone.utc),

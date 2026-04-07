@@ -133,6 +133,8 @@ class DecisionMemo(BaseModel):
     red_flags: list[RedFlag] = Field(default_factory=list)
 
     decision_factors: DecisionFactors
+    next_action: Optional[str] = Field(None, description="Suggested next step for human")
+    data_completeness: Optional[float] = Field(None, description="0.0-1.0 how much data we have")
 
     human_required: bool = Field(True, description="Always true — human decides")
 
