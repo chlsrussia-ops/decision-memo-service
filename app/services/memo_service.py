@@ -21,6 +21,7 @@ from app.schemas.decision import (
     ScoreSnapshot,
 )
 from app.services import explanation_service, llm_summary_service, risk_service, rule_engine, upstream_clients
+from app.services.metrics import metrics
 
 logger = logging.getLogger(__name__)
 
@@ -100,14 +101,22 @@ async def generate_memo(product_id: str, force_refresh: bool = False) -> Decisio
             llm_summary = await llm_summary_service.enhance_summary(memo)
             if llm_summary:
                 memo.summary = llm_summary
-                logger.info("LLM-enhanced summary for %s", product_id)
+                metrics.record_llm(success=True)
+            else:
+                metrics.record_llm(success=False)
         except Exception as e:
+            metrics.record_llm(success=False)
             logger.warning("LLM enhancement skipped for %s: %s", product_id, e)
 
+    # 9. Record metrics
+    metrics.record_memo(memo.recommended_action.value, data.latency_ms)
+    if data.errors:
+        metrics.record_upstream_error()
+
     logger.info(
-        "Memo generated for %s: action=%s confidence=%.2f flags=%d risks=%d",
+        "Memo generated for %s: action=%s confidence=%.2f flags=%d risks=%d latency=%dms",
         product_id, memo.recommended_action.value, memo.confidence,
-        len(memo.red_flags), len(memo.risks),
+        len(memo.red_flags), len(memo.risks), data.latency_ms,
     )
 
     return memo

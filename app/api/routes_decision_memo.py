@@ -29,7 +29,7 @@ from app.schemas.decision import (
     SystemHealth,
     UpstreamStatus,
 )
-from app.services import decision_store, memo_service, upstream_clients
+from app.services import decision_store, memo_service, prioritization_service, upstream_clients
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["decision-memo"])
@@ -95,13 +95,19 @@ async def record_human_decision(request: HumanDecisionRequest) -> HumanDecisionR
     except Exception:
         logger.warning("Could not generate memo for decision context: %s", request.product_id)
 
-    return decision_store.save_decision(
+    result = decision_store.save_decision(
         product_id=request.product_id,
         action=request.action,
         note=request.note,
         system_action=system_action,
         confidence=confidence,
     )
+
+    # Record metrics
+    from app.services.metrics import metrics
+    metrics.record_decision(request.action.value, result.agreed_with_system)
+
+    return result
 
 
 # ── GET /api/audit-trail ────────────────────────────────────────────
@@ -149,17 +155,8 @@ async def get_prioritized_products() -> PrioritizedListResponse:
     product_ids = await _collect_product_ids()
     memos = await memo_service.generate_memos_batch(product_ids)
 
-    # Sort: BUY_CANDIDATE > WATCH > REJECT, then by confidence desc, then red_flags desc
-    action_order = {"BUY_CANDIDATE": 0, "WATCH": 1, "REJECT": 2}
-
-    sorted_memos = sorted(
-        memos,
-        key=lambda m: (
-            action_order.get(m.recommended_action.value, 3),
-            -len(m.red_flags),  # more flags = higher priority (needs attention)
-            -m.confidence,
-        ),
-    )
+    # Phase 7: smart ranking via prioritization_service
+    sorted_memos = prioritization_service.rank_memos(memos)
 
     products = [
         ProductPriority(
@@ -180,6 +177,19 @@ async def get_prioritized_products() -> PrioritizedListResponse:
         total=len(products),
         generated_at=datetime.now(timezone.utc),
     )
+
+
+# ── GET /api/system/metrics ──────────────────────────────────────────
+
+@router.get(
+    "/system/metrics",
+    summary="Метрики сервиса",
+    description="In-memory счётчики: memos, decisions, latency, LLM, errors.",
+)
+async def get_metrics():
+    """Get service metrics snapshot."""
+    from app.services.metrics import metrics
+    return metrics.snapshot()
 
 
 # ── GET /api/system/decision-health ─────────────────────────────────
