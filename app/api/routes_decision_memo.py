@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
+from fastapi import Query
+
 from app.config import settings
 from app.schemas.decision import (
     DecisionMemo,
@@ -116,8 +118,8 @@ async def get_prioritized_products() -> PrioritizedListResponse:
       2. Within group: higher confidence first
       3. Red flags push items up (need attention)
     """
-    # Phase 1: use mock product IDs
-    product_ids = list(upstream_clients.MOCK_PRODUCTS.keys())
+    # Phase 2: fetch real product IDs from TCS + scoring candidates
+    product_ids = await _collect_product_ids()
     memos = await memo_service.generate_memos_batch(product_ids)
 
     # Sort: BUY_CANDIDATE > WATCH > REJECT, then by confidence desc, then red_flags desc
@@ -193,3 +195,55 @@ async def check_health() -> SystemHealth:
         upstreams=upstream_statuses,
         checked_at=datetime.now(timezone.utc),
     )
+
+
+# ── Helpers ──────────────────────────────────────────────────────────
+
+async def _collect_product_ids() -> list[str]:
+    """Collect product IDs from scored candidates + TCS products."""
+    import httpx
+
+    ids: list[str] = []
+    seen: set[str] = set()
+
+    def _add(pid: str):
+        if pid and pid not in seen:
+            ids.append(pid)
+            seen.add(pid)
+
+    # 1. Scored candidates (those that actually have scores)
+    try:
+        headers = {"X-API-Key": settings.SCORING_API_KEY}
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            # Check candidates 1-10 for scores
+            for cid in range(1, 11):
+                resp = await client.get(
+                    f"{settings.SCORING_SERVICE_URL}/api/scoring/candidates/{cid}",
+                    headers=headers,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("final_score") is not None:
+                        _add(str(cid))
+    except Exception as e:
+        logger.warning("Failed to fetch scoring candidates: %s", e)
+
+    # 2. TCS products (YUYU catalog)
+    try:
+        headers = {"X-API-Key": settings.TCS_API_KEY}
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{settings.TCS_URL}/api/products", headers=headers)
+            if resp.status_code == 200:
+                for p in resp.json():
+                    sku = p.get("sku")
+                    if sku:
+                        _add(sku)
+    except Exception as e:
+        logger.warning("Failed to fetch TCS products: %s", e)
+
+    # Fallback: mock IDs if nothing found
+    if not ids:
+        ids = list(upstream_clients.MOCK_PRODUCTS.keys())
+        logger.info("No real products found, using mock data")
+
+    return ids

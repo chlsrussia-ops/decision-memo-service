@@ -31,11 +31,17 @@ async def generate_memo(product_id: str, force_refresh: bool = False) -> Decisio
     This is the single entry point — one call, full memo.
     """
     # 1. Fetch upstream data
-    data = await upstream_clients.fetch_upstream_data(product_id)
-    logger.info(
-        "Upstream data fetched for %s in %dms (scoring=%s, demand=%s)",
-        product_id, data.latency_ms, data.scoring_available, data.demand_available,
-    )
+    # Route: PROD-xxx → mock data, everything else → real upstream
+    if product_id.startswith("PROD-"):
+        data = await upstream_clients.fetch_mock_data(product_id)
+        logger.info("Mock data loaded for %s", product_id)
+    else:
+        data = await upstream_clients.fetch_upstream_data(product_id)
+        logger.info(
+            "Upstream data fetched for %s in %dms (scoring=%s, demand=%s, analytics=%s)",
+            product_id, data.latency_ms, data.scoring_available,
+            data.demand_available, data.analytics_available,
+        )
 
     # 2. Run rule engine
     evaluation = rule_engine.evaluate(data)
