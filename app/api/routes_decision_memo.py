@@ -179,6 +179,18 @@ async def get_prioritized_products() -> PrioritizedListResponse:
     )
 
 
+# ── GET /api/system/rules ────────────────────────────────────────────
+
+@router.get("/system/rules", summary="Текущие правила")
+async def get_rules():
+    """Get current rule engine configuration and version history."""
+    from app.services import rule_registry
+    return {
+        "current": rule_registry.get_current_rules(),
+        "history": rule_registry.get_history(),
+    }
+
+
 # ── GET /api/system/metrics ──────────────────────────────────────────
 
 @router.get(
@@ -189,7 +201,10 @@ async def get_prioritized_products() -> PrioritizedListResponse:
 async def get_metrics():
     """Get service metrics snapshot."""
     from app.services.metrics import metrics
-    return metrics.snapshot()
+    from app.services import memo_cache
+    data = metrics.snapshot()
+    data["cache"] = memo_cache.stats()
+    return data
 
 
 # ── GET /api/system/decision-health ─────────────────────────────────
