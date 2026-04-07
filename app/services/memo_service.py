@@ -20,7 +20,7 @@ from app.schemas.decision import (
     DemandSnapshot,
     ScoreSnapshot,
 )
-from app.services import explanation_service, risk_service, rule_engine, upstream_clients
+from app.services import explanation_service, llm_summary_service, risk_service, rule_engine, upstream_clients
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,17 @@ async def generate_memo(product_id: str, force_refresh: bool = False) -> Decisio
         generated_at=datetime.now(timezone.utc),
         upstream_latency_ms=data.latency_ms,
     )
+
+    # 8. LLM summary enhancement (optional, non-blocking)
+    from app.config import settings as _cfg
+    if _cfg.LLM_ENABLED and _cfg.ANTHROPIC_API_KEY:
+        try:
+            llm_summary = await llm_summary_service.enhance_summary(memo)
+            if llm_summary:
+                memo.summary = llm_summary
+                logger.info("LLM-enhanced summary for %s", product_id)
+        except Exception as e:
+            logger.warning("LLM enhancement skipped for %s: %s", product_id, e)
 
     logger.info(
         "Memo generated for %s: action=%s confidence=%.2f flags=%d risks=%d",

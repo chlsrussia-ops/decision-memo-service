@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     SCORING_API_KEY: str = ""
     TCS_API_KEY: str = ""
 
+    # LLM
+    ANTHROPIC_API_KEY: str = ""
+    LLM_ENABLED: bool = True
+
     # Timeouts (seconds)
     UPSTREAM_TIMEOUT: float = 10.0
     UPSTREAM_RETRIES: int = 2
