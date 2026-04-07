@@ -19,6 +19,7 @@ from fastapi import Query
 
 from app.config import settings
 from app.schemas.decision import (
+    AuditTrailResponse,
     DecisionMemo,
     DecisionMemoRequest,
     HumanDecisionRequest,
@@ -28,7 +29,7 @@ from app.schemas.decision import (
     SystemHealth,
     UpstreamStatus,
 )
-from app.services import memo_service, upstream_clients
+from app.services import decision_store, memo_service, upstream_clients
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["decision-memo"])
@@ -83,23 +84,49 @@ async def get_decision_memo(product_id: str) -> DecisionMemo:
     description="Сохраняет финальное решение (approve/reject/watch). Phase 5: persistence.",
 )
 async def record_human_decision(request: HumanDecisionRequest) -> HumanDecisionResponse:
-    """Record a human decision. Phase 5: will persist to database."""
-    # TODO Phase 5: persist to database, link to memo
-    import uuid
+    """Record a human decision with persistence and audit trail."""
+    # Generate memo to capture system recommendation at decision time
+    system_action = None
+    confidence = None
+    try:
+        memo = await memo_service.generate_memo(request.product_id)
+        system_action = memo.recommended_action
+        confidence = memo.confidence
+    except Exception:
+        logger.warning("Could not generate memo for decision context: %s", request.product_id)
 
-    logger.info(
-        "Human decision recorded: product=%s action=%s note=%s",
-        request.product_id, request.action.value, request.note,
-    )
-
-    return HumanDecisionResponse(
-        id=str(uuid.uuid4()),
+    return decision_store.save_decision(
         product_id=request.product_id,
         action=request.action,
         note=request.note,
-        decided_at=datetime.now(timezone.utc),
-        memo_snapshot=None,  # TODO Phase 5: attach memo snapshot
+        system_action=system_action,
+        confidence=confidence,
     )
+
+
+# ── GET /api/audit-trail ────────────────────────────────────────────
+
+@router.get(
+    "/audit-trail",
+    response_model=AuditTrailResponse,
+    summary="Аудит решений",
+    description="История всех решений с agreement rate.",
+)
+async def get_audit_trail(limit: int = Query(100, ge=1, le=500)) -> AuditTrailResponse:
+    """Get audit trail of all human decisions."""
+    return decision_store.get_audit_trail(limit=limit)
+
+
+# ── GET /api/decisions/{product_id} ─────────────────────────────────
+
+@router.get(
+    "/decisions/{product_id}",
+    summary="История решений по продукту",
+)
+async def get_product_decisions(product_id: str):
+    """Get decision history for a specific product."""
+    entries = decision_store.get_decisions(product_id=product_id, limit=50)
+    return {"product_id": product_id, "entries": entries, "total": len(entries)}
 
 
 # ── GET /api/products/prioritized ───────────────────────────────────

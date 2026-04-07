@@ -10,6 +10,8 @@ services:
       - DMS_TCS_URL=http://localhost:8400
       - DMS_SCORING_API_KEY=6Bcb8WQVXDgVIVtnV22bGnGx3xf7az8pvJBFbnF9SHk
       - DMS_TCS_API_KEY=S6mCshAUjUSoTYCrnof0vbFK67SldEhkOLTAHUNXFzo
+    volumes:
+      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8600/health')"]

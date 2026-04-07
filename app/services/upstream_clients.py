@@ -113,23 +113,31 @@ async def fetch_scoring(product_id: str) -> dict:
 
     Accepts:
       - numeric candidate_id (e.g. "1", "42")
-
-    Non-numeric IDs (SKUs like YUYU-SW-X1) don't exist in the scoring
-    service, so we skip the lookup to avoid 422 errors.
+      - product_id that maps to a candidate
 
     Returns dict with score fields or empty dict on failure.
     """
     headers = {"X-API-Key": settings.SCORING_API_KEY}
     base = settings.SCORING_SERVICE_URL
 
-    # Only try scoring for numeric candidate IDs
+    # Try direct candidate lookup if numeric
+    candidate_id = product_id
     if product_id.isdigit():
-        url = f"{base}/api/scoring/candidates/{product_id}"
+        url = f"{base}/api/scoring/candidates/{candidate_id}"
         data = await _get_with_retry(url, headers=headers)
-        if data and "final_score" in data:
+        if data:
             return data
 
-    # Non-numeric IDs don't exist in scoring service
+    # Try via intelligence product search
+    url = f"{base}/api/intelligence/products/{product_id}"
+    data = await _get_with_retry(url, headers=headers)
+    if data and "id" in data:
+        cid = data["id"]
+        score_url = f"{base}/api/scoring/candidates/{cid}"
+        score_data = await _get_with_retry(score_url, headers=headers)
+        if score_data:
+            return score_data
+
     return {}
 
 

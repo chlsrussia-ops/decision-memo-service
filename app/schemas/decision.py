@@ -158,7 +158,28 @@ class HumanDecisionResponse(BaseModel):
     action: HumanAction
     note: Optional[str]
     decided_at: datetime
-    memo_snapshot: Optional[DecisionMemo] = None
+    recommended_action: Optional[RecommendedAction] = None
+    confidence: Optional[float] = None
+    agreed_with_system: Optional[bool] = None
+
+
+class AuditEntry(BaseModel):
+    """Single audit trail entry — human decision + system recommendation."""
+    id: str
+    product_id: str
+    human_action: HumanAction
+    system_action: Optional[RecommendedAction] = None
+    confidence: Optional[float] = None
+    agreed: Optional[bool] = None
+    note: Optional[str] = None
+    decided_at: datetime
+
+
+class AuditTrailResponse(BaseModel):
+    """Audit trail — all human decisions."""
+    entries: list[AuditEntry]
+    total: int
+    agreement_rate: Optional[float] = None
 
 
 # ── Prioritized List ────────────────────────────────────────────────
