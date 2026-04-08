@@ -2,19 +2,12 @@ services:
   decision-memo-service:
     build: .
     container_name: decision-memo-service
+    ports:
+      - "127.0.0.1:8600:8600"
     mem_limit: 512m
-    network_mode: host
     env_file: .env
     environment:
       - DMS_DEBUG=false
-      - DMS_SCORING_SERVICE_URL=http://localhost:8003
-      - DMS_DEMAND_LAYER_URL=http://62.210.236.167:8090
-      - DMS_TCS_URL=http://localhost:8400
-      - DMS_SCORING_API_KEY=6Bcb8WQVXDgVIVtnV22bGnGx3xf7az8pvJBFbnF9SHk
-      - DMS_TCS_API_KEY=S6mCshAUjUSoTYCrnof0vbFK67SldEhkOLTAHUNXFzo
-      - DMS_LLM_ENABLED=true
-    volumes:
-      - ./data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8600/health')"]
