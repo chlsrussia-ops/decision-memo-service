@@ -47,6 +47,9 @@ app.add_middleware(
 # Routes
 app.include_router(router)
 
+from app.api.routes_canonical_memo import router as canonical_memo_router
+app.include_router(canonical_memo_router)
+
 
 @app.get("/health")
 async def health():

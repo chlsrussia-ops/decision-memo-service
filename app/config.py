@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     SCORING_SERVICE_URL: str = "http://localhost:8003"
     DEMAND_LAYER_URL: str = "http://localhost:8090"
     TCS_URL: str = "http://localhost:8400"
+    DECISION_ENGINE_URL: str = "http://localhost:8010"
 
     # API keys
     SCORING_API_KEY: str = ""

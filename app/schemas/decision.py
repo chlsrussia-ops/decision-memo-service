@@ -37,6 +37,7 @@ class HumanAction(str, Enum):
     APPROVE = "APPROVE"
     REJECT = "REJECT"
     WATCH = "WATCH"
+    OBSERVE = "OBSERVE"
 
 
 class RedFlagCode(str, Enum):
