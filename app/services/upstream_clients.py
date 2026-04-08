@@ -128,15 +128,17 @@ async def fetch_scoring(product_id: str) -> dict:
         if data:
             return data
 
-    # Try via intelligence product search
-    url = f"{base}/api/intelligence/products/{product_id}"
-    data = await _get_with_retry(url, headers=headers)
-    if data and "id" in data:
-        cid = data["id"]
-        score_url = f"{base}/api/scoring/candidates/{cid}"
-        score_data = await _get_with_retry(score_url, headers=headers)
-        if score_data:
-            return score_data
+    # Try via intelligence product search by name (TC expects int for /products/{id})
+    search_url = f"{base}/api/intelligence/top-products?q={product_id}&limit=1"
+    search_data = await _get_with_retry(search_url, headers=headers)
+    if search_data and isinstance(search_data, list) and len(search_data) > 0:
+        found = search_data[0]
+        cid = found.get("id")
+        if cid:
+            score_url = f"{base}/api/scoring/candidates/{cid}"
+            score_data = await _get_with_retry(score_url, headers=headers)
+            if score_data:
+                return score_data
 
     return {}
 
