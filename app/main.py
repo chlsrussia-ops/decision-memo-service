@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # App
-app = FastAPI(
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, 
     title="Decision Memo Service",
     description=(
         "Human-in-the-loop decision support system. "
@@ -40,7 +40,7 @@ app = FastAPI(
 app.add_middleware(ApiKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://mybot123.org"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
