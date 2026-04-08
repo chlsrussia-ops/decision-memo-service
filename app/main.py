@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import FastAPI
+from app.core.auth import ApiKeyMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes_decision_memo import router
@@ -36,6 +37,7 @@ app = FastAPI(
 )
 
 # CORS
+app.add_middleware(ApiKeyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
