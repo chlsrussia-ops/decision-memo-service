@@ -2,9 +2,7 @@ services:
   decision-memo-service:
     build: .
     container_name: decision-memo-service
-    mem_limit: 512m
-    ports:
-      - "127.0.0.1:8600:8600"
+    network_mode: host
     env_file: .env
     environment:
       - DMS_DEBUG=false
