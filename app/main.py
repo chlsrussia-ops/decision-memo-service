@@ -24,7 +24,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # App
-app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, 
+app = FastAPI(
     title="Decision Memo Service",
     description=(
         "Human-in-the-loop decision support system. "
