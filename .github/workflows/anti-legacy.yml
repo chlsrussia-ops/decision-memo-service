@@ -1,0 +1,115 @@
+name: anti-legacy
+
+# Блокирует PR, если пытаются добавить новые файлы в deprecated-каталоги,
+# и предупреждает, если в них меняют существующие файлы.
+# Источник правды — DEPRECATED_PATHS.yml в корне репозитория.
+
+on:
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install PyYAML
+        run: pip install pyyaml==6.0.2
+
+      - name: Check deprecated paths
+        id: check
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import os, subprocess, sys, yaml, pathlib
+
+          root = pathlib.Path(".")
+          cfg_path = root / "DEPRECATED_PATHS.yml"
+          if not cfg_path.exists():
+              print("DEPRECATED_PATHS.yml отсутствует — guard пропущен.")
+              sys.exit(0)
+
+          cfg = yaml.safe_load(cfg_path.read_text()) or {}
+          rules = cfg.get("deprecated_paths", []) or []
+          if not rules:
+              print("Список deprecated_paths пуст — нечего проверять.")
+              sys.exit(0)
+
+          base = os.environ["BASE_SHA"]
+          head = os.environ["HEAD_SHA"]
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          # Added / Modified файлы в PR.
+          added = git("diff", "--name-only", "--diff-filter=A", f"{base}...{head}").splitlines()
+          modified = git("diff", "--name-only", "--diff-filter=M", f"{base}...{head}").splitlines()
+
+          errors, warnings = [], []
+
+          def match(path, rule_path):
+              rp = rule_path.rstrip("/")
+              return path == rp or path.startswith(rp + "/")
+
+          for rule in rules:
+              rpath = rule["path"]
+              reason = rule.get("reason", "—")
+              replacement = rule.get("replacement", "—")
+              block_new = rule.get("block_new_files", True)
+              block_edits = rule.get("block_edits", False)
+
+              for f in added:
+                  if match(f, rpath) and block_new:
+                      errors.append(
+                          f"NEW FILE в deprecated-пути запрещено: {f}\n"
+                          f"  Правило: {rpath}\n  Причина: {reason}\n  Вместо: {replacement}"
+                      )
+              for f in modified:
+                  if match(f, rpath):
+                      if block_edits:
+                          errors.append(
+                              f"EDIT в deprecated-пути запрещён: {f}\n"
+                              f"  Правило: {rpath}\n  Причина: {reason}\n  Вместо: {replacement}"
+                          )
+                      else:
+                          warnings.append(
+                              f"EDIT в deprecated-пути: {f} — лучше мигрировать в {replacement} "
+                              f"({reason})"
+                          )
+
+          if warnings:
+              print("::group::anti-legacy warnings")
+              for w in warnings:
+                  print(f"::warning ::{w}")
+              print("::endgroup::")
+
+          if errors:
+              print("::group::anti-legacy errors")
+              for e in errors:
+                  print(f"::error ::{e}")
+              print("::endgroup::")
+              print("\nЕсли деление на deprecated/каноничное изменилось — "
+                    "обновите DEPRECATED_PATHS.yml в том же PR.")
+              sys.exit(1)
+
+          print("OK: запрещённых изменений в deprecated-путях не найдено.")
+          PY
+
+      - name: Detect proxy wrappers
+        run: |
+          if [ -f scripts/detect_proxy_wrappers.py ]; then
+            python3 scripts/detect_proxy_wrappers.py --ci --root backend || exit 1
+          else
+            echo "scripts/detect_proxy_wrappers.py отсутствует — шаг пропущен."
+          fi
