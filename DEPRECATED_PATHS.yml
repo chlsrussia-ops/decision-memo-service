@@ -1,0 +1,32 @@
+# ============================================================
+# DEPRECATED_PATHS.yml — реестр устаревших каталогов репозитория.
+# Читается CI (.github/workflows/anti-legacy.yml) и скриптами
+# scripts/add_legacy_banner.py, scripts/detect_proxy_wrappers.py.
+#
+# Формат записи:
+#   - path: "путь/относительно/корня/"       # ОБЯЗАТЕЛЬНО слэш на конце для папок
+#     reason: "Зачем помечено и куда мигрировать"
+#     replacement: "backend/app/..."          # куда писать новый код
+#     deprecated_since: "2026-03-01"          # дата пометки (YYYY-MM-DD)
+#     block_new_files: true                   # CI fail'ит PR с новыми файлами тут
+#     block_edits: false                      # true => fail на любых правках
+# ============================================================
+
+deprecated_paths:
+  # Примеры. Замените/дополните по факту. Пустой список — тоже валидно.
+  - path: "backend/legacy/"
+    reason: "Старая версия до рефакторинга 2026-03-01. Канонический источник — backend/app/."
+    replacement: "backend/app/"
+    deprecated_since: "2026-03-01"
+    block_new_files: true
+    block_edits: false
+
+  - path: "frontend/old/"
+    reason: "До редизайна март 2026."
+    replacement: "frontend/src/"
+    deprecated_since: "2026-03-15"
+    block_new_files: true
+    block_edits: false
+
+# Сколько дней proxy-обёртке разрешено жить до CI-fail
+proxy_wrapper_max_age_days: 30
