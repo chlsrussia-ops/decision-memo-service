@@ -1,0 +1,25 @@
+# ============================================================
+# CODEOWNERS — кто обязан approve изменения в данных путях.
+# Документация: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+#
+# Порядок важен: нижние правила побеждают. Правила для deprecated-путей
+# идут в конце, чтобы перекрыть общие правила и потребовать явного approver.
+# ============================================================
+
+# Обычные пути — без ограничений (нет owner'а = любой может approve).
+# При желании можно раскомментировать общее правило:
+# *                         @chlsrussia-ops
+
+# --- Инфраструктура / CI — повышенная внимательность ---
+/.github/                   @chlsrussia-ops
+/infra/                     @chlsrussia-ops
+/scripts/                   @chlsrussia-ops
+/DEPRECATED_PATHS.yml       @chlsrussia-ops
+
+# --- DEPRECATED-каталоги: только с явным approve ---
+# Любая правка здесь = sign-off от владельца.
+/backend/legacy/            @chlsrussia-ops
+/frontend/old/              @chlsrussia-ops
+
+# Пометка "app/ подозрительный" — если заметите proxy-обёртки, ping owner'а.
+# /backend/app/**           @chlsrussia-ops   # (раскомментировать только если app/ = legacy)
