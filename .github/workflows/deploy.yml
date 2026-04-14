@@ -1,0 +1,48 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          timeout: 300s
+          command_timeout: 10m
+          script: |
+            set -e
+            REPO=${{ github.event.repository.name }}
+            cd /opt/$REPO
+            echo "→ Pulling latest..."
+            git fetch origin
+            BRANCH=$(git branch --show-current)
+            git reset --hard origin/$BRANCH
+            echo "→ Docker compose up..."
+            if [ -f docker-compose.yml ]; then
+              docker compose pull 2>&1 | tail -5 || true
+              docker compose up -d --build 2>&1 | tail -10
+              sleep 5
+              docker compose ps
+            else
+              echo "No docker-compose.yml — skipping container restart"
+            fi
+            echo "✓ Deploy complete"
+
+      - name: Telegram alert on failure
+        if: failure()
+        env:
+          TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TG_CHAT: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: |
+          if [ -z "$TG_TOKEN" ]; then exit 0; fi
+          MSG="❌ Deploy failed: ${{ github.repository }} @ ${{ github.sha }}"
+          curl -sS -X POST "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TG_CHAT}" --data-urlencode "text=${MSG}" || true
